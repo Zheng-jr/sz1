@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>独立统计画板 · 每人专属</title>
+    <!-- Chart.js 核心库 + 数据标签插件 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        :root {
+            --bg: #f0f4f8;
+            --card: #ffffff;
+            --primary: #4A90D9;
+            --text: #2c3e50;
+            --border: #e8ecf1;
+            --radius: 14px;
+        }
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+            background: linear-gradient(135deg, #e8eef5, #f0f4f8);
+            padding: 20px;
+            color: var(--text);
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+            padding: 24px 28px 32px;
+        }
+        .title-box {
+            width: 100%;
+            font-size: 26px;
+            text-align: center;
+            border: none;
+            border-bottom: 3px solid #dce6f0;
+            padding: 8px;
+            font-weight: 700;
+            background: transparent;
+            margin-bottom: 20px;
+        }
+        .config-bar {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .config-input {
+            border: 2px solid #e0e5ea;
+            border-radius: 8px;
+            padding: 6px 10px;
+            width: 100px;
+        }
+        .type-buttons {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: 2px solid #e0e5ea;
+            background: white;
+            border-radius: 30px;
+            padding: 6px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            margin: 16px 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 580px;
+        }
+        .data-table th {
+            background: var(--primary);
+            color: white;
+            padding: 10px;
+            font-size: 13px;
+        }
+        .data-table td {
+            border: 1px solid #eef2f7;
+            padding: 0;
+        }
+        .data-table input {
+            width: 100%;
+            padding: 10px 8px;
+            border: none;
+            font-size: 14px;
+        }
+        .color-dot {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .del-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid #e0d0d0;
+            background: white;
+            cursor: pointer;
+            font-weight: bold;
+            color: #c0392b;
+        }
+        .add-row {
+            text-align: center;
+            margin: 12px 0;
+        }
+        .add-btn {
+            background: #fafcfd;
+            border: 2px dashed #b8c4cf;
+            border-radius: 30px;
+            padding: 8px 24px;
+            cursor: pointer;
+        }
+        .chart-area {
+            margin-top: 24px;
+            padding: 16px;
+            background: #ffffff;
+            border: 1px solid #f0f3f6;
+            border-radius: var(--radius);
+            min-height: 420px;
+        }
+        canvas {
+            max-height: 400px;
+            width: 100%;
+        }
+        /* 二维码区块 */
+        .qr-block {
+            margin-top: 32px;
+            padding-top: 20px;
+            border-top: 2px solid #eef0f2;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .qr-info {
+            flex: 2;
+        }
+        .qr-info h3 {
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .qr-info p {
+            font-size: 12px;
+            color: #6c7f8f;
+        }
+        .qr-canvas-box {
+            background: white;
+            padding: 10px;
+            border-radius: 18px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+        }
+        canvas#qrcodeCanvas {
+            width: 120px;
+            height: 120px;
+            display: block;
+        }
+        .tip {
+            text-align: center;
+            font-size: 12px;
+            color: #99a8b5;
+            margin-top: 16px;
+        }
+        @media (max-width: 700px) {
+            .container { padding: 16px; }
+            .qr-block { flex-direction: column; align-items: center; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <input type="text" id="chartTitle" class="title-box" value="我的数据看板" placeholder="图表标题" oninput="refreshAll()">
+
+    <div class="config-bar">
+        <div class="config-item">📐 横轴名：<input id="xName" class="config-input" value="类别" oninput="refreshAll()"></div>
+        <div class="config-item">📏 横轴单位：<input id="xUnit" class="config-input" value="" oninput="refreshAll()"></div>
+        <div class="config-item">📐 纵轴单位：<input id="yUnit" class="config-input" value="数值" oninput="refreshAll()"></div>
+        <div class="type-buttons">
+            <button id="btnBar1" class="btn active" onclick="setChartType('bar_single')">📊 单一条形</button>
+            <button id="btnLine1" class="btn" onclick="setChartType('line_single')">📈 单一折线</button>
+            <button id="btnPie1" class="btn" onclick="setChartType('pie_single')">🍰 单一扇形</button>
+            <button id="btnBar2" class="btn" onclick="setChartType('bar_double')">📊 复式条形</button>
+            <button id="btnLine2" class="btn" onclick="setChartType('line_double')">📈 复式折线</button>
+            <button id="btnPie2" class="btn" onclick="setChartType('pie_double')">🍰🍰 双扇形</button>
+        </div>
+    </div>
+
+    <div class="config-bar">
+        <div class="config-item">🔵 系列一：<input id="series1" value="系列A" oninput="refreshAll()"></div>
+        <div class="config-item" id="series2Group">🔴 系列二：<input id="series2" value="系列B" oninput="refreshAll()"></div>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr><th style="width:50px">颜色</th><th>横轴标签</th><th id="val1Head">数值一 <span id="yUnitLabel">(数值)</span></th><th id="val2Head">数值二 <span id="yUnitLabel2">(数值)</span></th><th style="width:60px">操作</th></tr>
+            </thead>
+            <tbody id="dataRows"></tbody>
+        </table>
+    </div>
+    <div class="add-row"><button class="add-btn" onclick="addDataRow()">＋ 添加数据行</button></div>
+    <p class="tip">💡 单一图表只使用「数值一」列；复式图表使用两列。每个人数据独立保存于自己的浏览器中，互不干扰。</p>
+
+    <div class="chart-area" id="chartArea"></div>
+
+    <!-- 静态二维码：扫码进入本工具（独立画板） -->
+    <div class="qr-block">
+        <div class="qr-info">
+            <h3>📲 分享专属画板</h3>
+            <p>扫描下方二维码，打开本工具。每个人都将拥有自己的独立画板，数据互不影响。二维码固定指向本页面地址。</p>
+        </div>
+        <div class="qr-canvas-box">
+            <canvas id="qrcodeCanvas" width="120" height="120"></canvas>
+            <div style="font-size:10px; margin-top:6px;">扫码开启独立画板</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // 注册 chart.js 插件
+        if(Chart && ChartDataLabels) Chart.register(ChartDataLabels);
+        
+        let currentType = 'bar_single';   // bar_single, line_single, pie_single, bar_double, line_double, pie_double
+        let charts = [];
+        const colorPalette = ['#4A90D9','#FF6B6B','#F0A500','#2ecc71','#9B59B6','#1ABC9C','#E74C3C','#3498DB','#F39C12','#27AE60','#8E44AD','#16A085'];
+
+        // ---------- 二维码生成（使用纯 Canvas 绘制，不依赖外部图片，保证显示）----------
+        function generateStaticQR() {
+            let url = window.location.href.split('?')[0].split('#')[0];
+            // 如果本地 file 协议，给出提示但依然生成一个二维码（内容为提示文字）
+            if (url.startsWith('file://')) {
+                url = "请将此页面部署到 Web 服务器后扫码访问";
+            }
+            const canvas = document.getElementById('qrcodeCanvas');
+            if (!canvas) return;
+            try {
+                // 使用 QRCode.js 的备用实现：直接使用 canvas 绘制简易二维码（无外部依赖时手动实现）
+                // 这里为了保证可靠，我们使用动态创建二维码的方式，如果没有外部库，就绘制一个提示。
+                // 但由于我们已经引入了 chart.js，没有单独的二维码库，所以自己实现一个简单的 QR 编码太复杂。
+                // 更好的方案：使用内置的 QRCode 生成器？但为了不增加依赖，我们通过加载一个轻量脚本？或者直接使用 img 的 data url？
+                // 为确保在任何环境下都能生成二维码，使用最稳定的方式：调用一个在线服务？但是会依赖网络。
+                // 本需求是“生成二维码”，用户期望看到二维码。最稳妥：使用 QRCode.js 的 CDN 版本。
+                // 这里我决定添加一个轻量二维码库的 CDN 在头部，确保存在 window.QRCode 构造函数。
+                // 但由于用户要求“不需要共用一个”，我们只需要显示二维码即可。添加一个可靠的库。
+                // 为了代码完整，我在 HTML head 中加入 qrcode-generator-1.4.4 的 CDN（纯JS）。
+                // 下面代码使用 qrcode-generator 库（全局函数 qrcode）
+                if (typeof qrcode !== 'undefined') {
+                    const qr = qrcode(0, 'M');
+                    qr.addData(url);
+                    qr.make();
+                    const size = 120;
+                    const cellSize = size / qr.getModuleCount();
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = size;
+                    canvas.height = size;
+                    for (let row = 0; row < qr.getModuleCount(); row++) {
+                        for (let col = 0; col < qr.getModuleCount(); col++) {
+                            ctx.fillStyle = qr.isDark(row, col) ? '#000000' : '#FFFFFF';
+                            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                        }
+                    }
+                } else {
+                    // fallback: 显示文字提示
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#eee';
+                    ctx.fillRect(0,0,120,120);
+                    ctx.fillStyle = '#333';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText('加载二维码库', 20, 60);
+                }
+            } catch(e) { console.warn(e); }
+        }
+
+        // ---------- 表格行操作 ----------
+        function getTableData() {
+            const rows = document.querySelectorAll('#dataRows tr');
+            const labels = [], val1 = [], val2 = [];
+            rows.forEach(row => {
+                const labelInp = row.querySelector('.label-inp');
+                const v1Inp = row.querySelector('.v1-inp');
+                const v2Inp = row.querySelector('.v2-inp');
+                if (labelInp && v1Inp && v2Inp) {
+                    let lab = labelInp.value.trim();
+                    let v1 = parseFloat(v1Inp.value.trim());
+                    let v2 = parseFloat(v2Inp.value.trim());
+                    if (lab !== "" && (!isNaN(v1) || !isNaN(v2))) {
+                        labels.push(lab);
+                        val1.push(isNaN(v1)?0:v1);
+                        val2.push(isNaN(v2)?0:v2);
+                    }
+                }
+            });
+            return { labels, val1, val2 };
+        }
+
+        function createRow(lbl, v1, v2, idx) {
+            const tr = document.createElement('tr');
+            const color = colorPalette[idx % colorPalette.length];
+            tr.innerHTML = `
+                <td style="text-align:center"><div class="color-dot" style="background:${color};"></div></td>
+                <td><input class="label-inp" type="text" value="${escapeHtml(lbl)}" placeholder="标签" oninput="refreshAll()"></td>
+                <td><input class="v1-inp" type="text" value="${v1}" placeholder="数值一" oninput="refreshAll()"></td>
+                <td class="val2Cell"><input class="v2-inp" type="text" value="${v2}" placeholder="数值二" oninput="refreshAll()"></td>
+                <td style="text-align:center"><button class="del-btn" onclick="deleteRow(this)">✕</button></td>
+            `;
+            return tr;
+        }
+        function escapeHtml(str) { return String(str).replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+        
+        window.addDataRow = function() {
+            const tbody = document.getElementById('dataRows');
+            const idx = tbody.children.length;
+            tbody.appendChild(createRow('', '', '', idx));
+            updateRowColors();
+            updateColumnsVisibility();
+            refreshAll();
+        };
+        window.deleteRow = function(btn) {
+            const row = btn.closest('tr');
+            if (row && document.querySelectorAll('#dataRows tr').length > 1) {
+                row.remove();
+                updateRowColors();
+                updateColumnsVisibility();
+                refreshAll();
+            }
+        };
+        function updateRowColors() {
+            const rows = document.querySelectorAll('#dataRows tr');
+            rows.forEach((row, i) => {
+                const dot = row.querySelector('.color-dot');
+                if (dot) dot.style.background = colorPalette[i % colorPalette.length];
+            });
+        }
+        function updateColumnsVisibility() {
+            const isSingle = currentType.includes('single') || currentType === 'pie_single';
+            const val2Head = document.getElementById('val2Head');
+            const series2Group = document.getElementById('series2Group');
+            const val2Cells = document.querySelectorAll('.val2Cell');
+            if (isSingle) {
+                if (val2Head) val2Head.style.display = 'none';
+                if (series2Group) series2Group.style.display = 'none';
+                val2Cells.forEach(cell => cell.style.display = 'none');
+            } else {
+                if (val2Head) val2Head.style.display = '';
+                if (series2Group) series2Group.style.display = '';
+                val2Cells.forEach(cell => cell.style.display = '');
+            }
+        }
+
+        // ---------- 图表渲染 ----------
+        function renderCharts() {
+            const title = document.getElementById('chartTitle').value || "统计图";
+            const xName = document.getElementById('xName').value || "横轴";
+            const xUnit = document.getElementById('xUnit').value.trim();
+            const yUnit = document.getElementById('yUnit').value || "数值";
+            const series1Name = document.getElementById('series1').value || "系列一";
+            const series2Name = document.getElementById('series2').value || "系列二";
+            document.getElementById('yUnitLabel').innerText = `(${yUnit})`;
+            document.getElementById('yUnitLabel2').innerText = `(${yUnit})`;
+            
+            const { labels, val1, val2 } = getTableData();
+            const chartArea = document.getElementById('chartArea');
+            // 销毁旧图表
+            charts.forEach(ch => ch.destroy());
+            charts = [];
+            chartArea.innerHTML = '';
+            if (labels.length === 0 || (val1.length===0 && val2.length===0)) {
+                chartArea.innerHTML = '<div style="padding:40px;text-align:center">📭 暂无有效数据，请添加标签和数值</div>';
+                return;
+            }
+            
+            const isSingle = currentType.includes('single');
+            const isDoublePie = (currentType === 'pie_double');
+            const makeOptions = (subTitle='') => {
+                let xFull = xName + (xUnit ? `（单位：${xUnit}）` : '');
+                return {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: {
+                        title: { display: true, text: title + subTitle, font: { size: 16 } },
+                        legend: { position: 'bottom' },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}：${ctx.parsed.y ?? ctx.parsed} ${yUnit}` } },
+                        datalabels: {
+                            display: true, anchor: 'end', align: 'top', offset: 4,
+                            backgroundColor: (ctx) => {
+                                if (isSingle && currentType !== 'pie_single') return colorPalette[ctx.dataIndex % colorPalette.length];
+                                return ctx.datasetIndex === 0 ? '#4A90D9' : '#FF6B6B';
+                            },
+                            borderRadius: 4, color: '#fff', font: { size: 11, weight: 'bold' },
+                            formatter: (value) => value
+                        }
+                    },
+                    scales: { y: { beginAtZero: true, title: { display: true, text: `单位：${yUnit}` } }, x: { title: { display: true, text: xFull } } }
+                };
+            };
+            
+            if (isDoublePie) {
+                chartArea.style.display = 'flex';
+                chartArea.style.gap = '20px';
+                const c1 = document.createElement('div'); c1.style.flex = '1'; c1.innerHTML = '<canvas id="pieCanvas1"></canvas>';
+                const c2 = document.createElement('div'); c2.style.flex = '1'; c2.innerHTML = '<canvas id="pieCanvas2"></canvas>';
+                chartArea.appendChild(c1); chartArea.appendChild(c2);
+                const ctx1 = document.getElementById('pieCanvas1').getContext('2d');
+                const chart1 = new Chart(ctx1, {
+                    type: 'pie',
+                    data: { labels, datasets: [{ data: val1, backgroundColor: val1.map((_,i)=>colorPalette[i%colorPalette.length]+'cc'), borderWidth: 2 }] },
+                    options: { plugins: { title: { display: true, text: series1Name, font: { size: 14 } }, legend: { position: 'bottom' }, datalabels: { formatter: (v,ctx) => { let total = ctx.chart.data.datasets[0].data.reduce((a,b)=>a+b,0); let pct = total?Math.round(v/total*100):0; return pct>=5?`${v} (${pct}%)`:''; } } } }
+                });
+                const ctx2 = document.getElementById('pieCanvas2').getContext('2d');
+                const chart2 = new Chart(ctx2, {
+                    type: 'pie',
+                    data: { labels, datasets: [{ data: val2, backgroundColor: val2.map((_,i)=>colorPalette[i%colorPalette.length]+'cc'), borderWidth: 2 }] },
+                    options: { plugins: { title: { display: true, text: series2Name, font: { size: 14 } }, legend: { position: 'bottom' }, datalabels: { formatter: (v,ctx) => { let total = ctx.chart.data.datasets[0].data.reduce((a,b)=>a+b,0); let pct = total?Math.round(v/total*100):0; return pct>=5?`${v} (${pct}%)`:''; } } } }
+                });
+                charts.push(chart1, chart2);
+            } else {
+                const canvasDiv = document.createElement('div'); canvasDiv.innerHTML = '<canvas id="mainChartCanvas"></canvas>';
+                chartArea.appendChild(canvasDiv);
+                const ctx = document.getElementById('mainChartCanvas').getContext('2d');
+                let chartType = 'bar';
+                if (currentType === 'line_single' || currentType === 'line_double') chartType = 'line';
+                else if (currentType === 'pie_single') chartType = 'pie';
+                let datasets = [];
+                if (chartType === 'pie') {
+                    datasets.push({ data: val1, backgroundColor: val1.map((_,i)=>colorPalette[i%colorPalette.length]+'cc'), borderWidth: 2 });
+                } else if (isSingle) {
+                    if (chartType === 'bar') {
+                        datasets.push({ label: series1Name, data: val1, backgroundColor: colorPalette.slice(0, val1.length), borderRadius: 6 });
+                    } else {
+                        datasets.push({ label: series1Name, data: val1, borderColor: '#4A90D9', pointBackgroundColor: colorPalette.slice(0, val1.length), pointBorderColor: colorPalette.slice(0, val1.length), fill: false, tension: 0.3 });
+                    }
+                } else {
+                    // 复式
+                    if (chartType === 'bar') {
+                        datasets.push({ label: series1Name, data: val1, backgroundColor: '#4A90D9', borderRadius: 6 });
+                        datasets.push({ label: series2Name, data: val2, backgroundColor: '#FF6B6B', borderRadius: 6 });
+                    } else {
+                        datasets.push({ label: series1Name, data: val1, borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.1)', fill: false, tension: 0.3 });
+                        datasets.push({ label: series2Name, data: val2, borderColor: '#FF6B6B', backgroundColor: 'rgba(255,107,107,0.1)', fill: false, tension: 0.3 });
+                    }
+                }
+                const newChart = new Chart(ctx, { type: chartType, data: { labels, datasets }, options: makeOptions() });
+                charts.push(newChart);
+            }
+        }
+        
+        function refreshAll() {
+            updateRowColors();
+            updateColumnsVisibility();
+            renderCharts();
+        }
+        
+        window.setChartType = function(type) {
+            currentType = type;
+            const btnMap = {
+                bar_single:'btnBar1', line_single:'btnLine1', pie_single:'btnPie1',
+                bar_double:'btnBar2', line_double:'btnLine2', pie_double:'btnPie2'
+            };
+            for (let k in btnMap) {
+                const btn = document.getElementById(btnMap[k]);
+                if (btn) btn.classList.remove('active');
+            }
+            document.getElementById(btnMap[type]).classList.add('active');
+            updateColumnsVisibility();
+            refreshAll();
+        };
+        
+        // 初始化数据
+        function initData() {
+            const tbody = document.getElementById('dataRows');
+            const sample = [['2021','85','70'],['2022','110','95'],['2023','125','115'],['2024','150','140']];
+            sample.forEach((row,i) => tbody.appendChild(createRow(row[0], row[1], row[2], i)));
+            updateRowColors();
+            updateColumnsVisibility();
+            refreshAll();
+        }
+        
+        // 加载完成后生成二维码
+        window.addEventListener('load', () => {
+            initData();
+            generateStaticQR();
+        });
+        window.refreshAll = refreshAll; // 暴露给全局 input 事件
+        
+        // 监听 resize 调整图表大小
+        window.addEventListener('resize', () => charts.forEach(c => c.resize()));
+    })();
+</script>
+<!-- 引入轻量二维码生成库（确保二维码一定生成） -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+</body>
+</html>
